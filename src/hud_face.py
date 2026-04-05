@@ -6,6 +6,7 @@ Procedural rendering using Pygame primitives — with holographic and glitch eff
 import math
 import random
 import pygame
+import numpy as np
 from settings import (
     EMOTION_KEYS, EMOTION_IDX,
     FACE_SKIN, FACE_SKIN_ANGRY, FACE_SKIN_FEAR, FACE_SKIN_DAMAGE,
@@ -13,6 +14,7 @@ from settings import (
     FACE_TRANSITION_SPEED, DAMAGE_FLASH_DURATION,
     HOLO_CYAN, HOLO_BLUE, HOLO_RED, HOLO_GLOW_ALPHA,
     SCANLINE_SPACING, GLITCH_MAX_OFFSET,
+    EMOTION_BLEND_DOMINANCE,
 )
 
 
@@ -57,18 +59,6 @@ class HUDFace:
         self.glitch_intensity = 0.0
         self.flicker_t = 0.0
 
-    def set_emotion(self, emotion_name):
-        """Set target emotion for smooth transition (FR-011)."""
-        if emotion_name == self.target_emotion:
-            return
-        self._prev_params = dict(self.current_params)
-        self.target_emotion = emotion_name
-        self.blend_t = 0.0
-        
-        # Minimal glitch burst on shift (US 4)
-        self.glitch_timer = 0.1
-        self.glitch_intensity = 0.3
-
     def trigger_damage(self):
         """Flash damage face override (FR-012) and glitch."""
         self.damage_timer = DAMAGE_FLASH_DURATION
@@ -78,44 +68,92 @@ class HUDFace:
     def set_low_health(self, is_low):
         self.low_health = is_low
 
-    def update(self, dt):
-        # Timers
+    def update(self, dt, emotion_data):
+        """Update face state-blending all detected emotions (US 5)."""
+        # --- 1. Update Timers ---
         if self.damage_timer > 0:
             self.damage_timer -= dt
         if self.glitch_timer > 0:
             self.glitch_timer -= dt
         else:
             self.glitch_intensity *= 0.9  # Decay
-
         self.flicker_t += dt * 10
         
-        # Advance transition blend
-        if self.blend_t < 1.0:
-            self.blend_t = min(1.0, self.blend_t + FACE_TRANSITION_SPEED * dt)
+        # --- 2. Calculate Blended Target ---
+        # scores: 7 floats in fixed order (happy, sad, angry, surprise, fear, disgust, neutral)
+        scores = emotion_data[:7]
+        total_score = np.sum(scores)
+        if total_score > 0:
+            scores = scores / total_score
+        else:
+            scores = np.zeros(7)
+            scores[6] = 1.0 # default to neutral
+            
+        # A. Weighted Average of all 7 emotions
+        weighted_target = {}
+        first_key = EMOTION_KEYS[0]
+        # Init weighted_target with first emotion scaled by score
+        for param_key in EMOTION_PARAMS[first_key]:
+            val = EMOTION_PARAMS[first_key][param_key]
+            if param_key == "skin":
+                weighted_target[param_key] = [val[0] * scores[0], val[1] * scores[0], val[2] * scores[0]]
+            else:
+                weighted_target[param_key] = val * scores[0]
+                
+        # Accumulate remaining emotions
+        for i in range(1, 7):
+            emo_key = EMOTION_KEYS[i]
+            score = scores[i]
+            params = EMOTION_PARAMS[emo_key]
+            for param_key in params:
+                val = params[param_key]
+                if param_key == "skin":
+                    weighted_target[param_key][0] += val[0] * score
+                    weighted_target[param_key][1] += val[1] * score
+                    weighted_target[param_key][2] += val[2] * score
+                else:
+                    weighted_target[param_key] += val * score
+                    
+        # B. Dominant Emotion Target
+        dominant_idx = np.argmax(scores)
+        dominant_params = EMOTION_PARAMS[EMOTION_KEYS[dominant_idx]]
+        
+        # Trigger internal glitch pulse if dominant emotion changed significantly
+        if EMOTION_KEYS[dominant_idx] != self.target_emotion:
+            self.target_emotion = EMOTION_KEYS[dominant_idx]
+            self.glitch_timer = max(self.glitch_timer, 0.1)
+            self.glitch_intensity = max(self.glitch_intensity, 0.3)
+            
+        # C. Final Target Merge (using configurable dominance)
+        mid_target = {}
+        for k in weighted_target:
+            if k == "skin":
+                mid_target[k] = _lerp_color(weighted_target[k], dominant_params[k], EMOTION_BLEND_DOMINANCE)
+            else:
+                mid_target[k] = _lerp(weighted_target[k], dominant_params[k], EMOTION_BLEND_DOMINANCE)
 
-        # Determine target params
+        # D. Add Low Health Overlay
         if self.damage_timer > 0:
             target = EMOTION_PARAMS["damage"]
         elif self.low_health:
-            # Blend between camera emotion and low_health worry
-            base = EMOTION_PARAMS.get(self.target_emotion, EMOTION_PARAMS["neutral"])
             worry = EMOTION_PARAMS["low_health"]
             target = {}
-            for key in base:
-                if key == "skin":
-                    target[key] = _lerp_color(base[key], worry[key], 0.5)
+            for k in mid_target:
+                if k == "skin":
+                    target[k] = _lerp_color(mid_target[k], worry[k], 0.5)
                 else:
-                    target[key] = _lerp(base[key], worry[key], 0.5)
+                    target[k] = _lerp(mid_target[k], worry[k], 0.5)
         else:
-            target = EMOTION_PARAMS.get(self.target_emotion, EMOTION_PARAMS["neutral"])
+            target = mid_target
 
-        # Interpolate current params toward target
-        t = self.blend_t
+        # --- 3. Apply Temporal Smoothing (transition to target) ---
+        # Instead of just snapping to target, we continue to lerp current_params toward target
+        # for maximum fluid motion.
         for key in self.current_params:
             if key == "skin":
-                self.current_params[key] = _lerp_color(self._prev_params[key], target[key], t)
+                self.current_params[key] = _lerp_color(self.current_params[key], target[key], FACE_TRANSITION_SPEED * dt)
             else:
-                self.current_params[key] = _lerp(self._prev_params[key], target[key], t)
+                self.current_params[key] = _lerp(self.current_params[key], target[key], FACE_TRANSITION_SPEED * dt)
 
     def draw(self, surface, cx, cy, size):
         """Draw the holographic face with glitches. (US 1 & 4)"""
@@ -225,26 +263,16 @@ class HUDFace:
             half_w = int(math.sqrt(r*r - dy*dy))
             
             if eye_region:
-                # Split line to avoid eyes
-                # Assume eye regions are centered around cx +- eye_spacing
-                # We can just skip the eyes entirely or draw segments
-                # For simplicity, if we are in eye y-height, we draw from edge until eye_x_start
-                # Left part
                 left_eye_x = eye_rects[0].left
                 right_eye_x = eye_rects[1].right
-                
-                # Line segment from cx-half_w to left_eye_x-2
                 if cx - half_w < left_eye_x - 2:
                     pygame.draw.line(surface, (255, 255, 255, alpha), 
                                      (cx - half_w, y), (left_eye_x - 2, y), 1)
-                # Middle part (between eyes)
                 if eye_rects[0].right + 2 < eye_rects[1].left - 2:
                     pygame.draw.line(surface, (255, 255, 255, alpha), 
                                      (eye_rects[0].right + 2, y), (eye_rects[1].left - 2, y), 1)
-                # Right part
                 if right_eye_x + 2 < cx + half_w:
                     pygame.draw.line(surface, (255, 255, 255, alpha), 
                                      (right_eye_x + 2, y), (cx + half_w, y), 1)
             else:
-                # Full line inside circle
                 pygame.draw.line(surface, (255, 255, 255, alpha), (cx - half_w, y), (cx + half_w, y), 1)

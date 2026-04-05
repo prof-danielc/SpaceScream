@@ -109,6 +109,7 @@ FACE_DECAY_RATE = 0.2        # per-second decay speed toward neutral
 # ─── HUD Face ────────────────────────────────────────────
 FACE_TRANSITION_SPEED = 2.0  # 1/seconds to complete transition (0.5s)
 DAMAGE_FLASH_DURATION = 0.5  # seconds
+EMOTION_BLEND_DOMINANCE = 0.6 # 1.0 = dominant only, 0.0 = pure weighted average
 
 # ─── Particles ────────────────────────────────────────────
 PARTICLE_COUNT = 8           # per asteroid destruction

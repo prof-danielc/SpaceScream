@@ -110,10 +110,9 @@ def main():
 
         # Read emotion data from shared array (consumer — FR-018)
         emotion_data = emotion.get_emotions()
-        dominant = emotion.get_dominant_emotion()
 
         # Update HUD
-        hud.update(dt, dominant, game.damage_event, game.ship.lives)
+        hud.update(dt, emotion_data, game.damage_event, game.ship.lives)
 
         # ─── Draw (to logical surface at fixed 1024×768) ──
         logical_surface.fill(BLACK)

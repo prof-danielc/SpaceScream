@@ -21,13 +21,12 @@ class HUD:
         self.font = pygame.font.SysFont("consolas", 22, bold=True)
         self.small_font = pygame.font.SysFont("consolas", 14)
 
-    def update(self, dt, emotion_name, damage_event, lives):
-        """Update the HUD face state."""
-        self.face.set_emotion(emotion_name)
+    def update(self, dt, emotion_data, damage_event, lives):
+        """Update HUD components."""
+        self.face.set_low_health(lives <= 1)
         if damage_event:
             self.face.trigger_damage()
-        self.face.set_low_health(lives <= 1)
-        self.face.update(dt)
+        self.face.update(dt, emotion_data)
 
     def draw(self, surface, score, lives, wave):
         """Draw the full HUD bar at the bottom of the screen."""
