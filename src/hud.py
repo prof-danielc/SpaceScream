@@ -71,6 +71,14 @@ class HUD:
         face_size = int(HUD_HEIGHT * 0.85)
         self.face.draw(surface, face_cx, face_cy, face_size)
 
-        # Face frame
-        frame_r = face_size // 2 + 4
-        pygame.draw.circle(surface, HUD_BORDER, (face_cx, face_cy), frame_r, 2)
+        # Face frame - Digital terminal brackets [ ]
+        frame_r = face_size // 2 + 8
+        b_len = 15  # Bracket segment length
+        
+        # Corners [top-left, top-right, bottom-left, bottom-right]
+        for sx, sy in [(-1, -1), (1, -1), (-1, 1), (1, 1)]:
+            px, py = face_cx + sx * frame_r, face_cy + sy * frame_r
+            # Draw L-shaped corner
+            pygame.draw.line(surface, HUD_BORDER, (px, py), (px - sx * b_len, py), 2)
+            pygame.draw.line(surface, HUD_BORDER, (px, py), (px, py - sy * b_len), 2)
+

@@ -95,7 +95,7 @@ class EmotionEngine:
             # --- EXPENSIVE WORK OUTSIDE LOCK (FR-019) ---
             back_buffer = np.zeros(EMOTION_ARRAY_SIZE, dtype=np.float64)
             back_buffer[6] = 1.0  # default neutral
-
+            
             try:
                 results = fer_detector.detect_emotions(frame)
                 if results and len(results) > 0:
@@ -111,12 +111,15 @@ class EmotionEngine:
                     back_buffer[FACE_DETECTED_IDX] = 0.0
                     back_buffer[TIMESTAMP_IDX] = time.time()
 
+                    # Hold the last face (DEPRECATED)
+                    with self._lock:
+                        prev = self._front_buffer.copy()
+                    back_buffer[:7] = prev[:7]
+
                     # Face-lost decay (FR: decay toward neutral after timeout)
                     elapsed = time.time() - self._last_face_time
                     if elapsed > FACE_LOST_DECAY_TIME:
                         # Decay is applied to the previous front buffer values
-                        with self._lock:
-                            prev = self._front_buffer.copy()
                         decay = FACE_DECAY_RATE * 0.1  # per-iteration decay
                         for i in range(7):
                             target = 1.0 if i == 6 else 0.0  # decay toward neutral

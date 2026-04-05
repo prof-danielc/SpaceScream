@@ -38,6 +38,14 @@ FACE_PUPIL = (30, 30, 30)
 FACE_MOUTH = (180, 60, 60)
 FACE_EYEBROW = (80, 60, 40)
 
+# Holographic colors
+HOLO_CYAN = (0, 255, 255)
+HOLO_BLUE = (0, 100, 255)
+HOLO_RED = (255, 0, 80)
+HOLO_GLOW_ALPHA = 40
+SCANLINE_SPACING = 3
+GLITCH_MAX_OFFSET = 10
+
 # Debug overlay colors per emotion
 EMOTION_COLORS = {
     "happy": (255, 220, 50),
@@ -95,8 +103,8 @@ EMOTION_ARRAY_SIZE = 9       # 7 emotions + face_detected + timestamp
 EMOTION_IDX = {name: i for i, name in enumerate(EMOTION_KEYS)}
 FACE_DETECTED_IDX = 7
 TIMESTAMP_IDX = 8
-FACE_LOST_DECAY_TIME = 2.0   # seconds before decaying to neutral
-FACE_DECAY_RATE = 0.5        # per-second decay speed toward neutral
+FACE_LOST_DECAY_TIME = 5.0   # seconds before decaying to neutral
+FACE_DECAY_RATE = 0.2        # per-second decay speed toward neutral
 
 # ─── HUD Face ────────────────────────────────────────────
 FACE_TRANSITION_SPEED = 2.0  # 1/seconds to complete transition (0.5s)
