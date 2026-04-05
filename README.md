@@ -1,5 +1,7 @@
 # 🚀 SpaceScream
 
+In space, no one can hear you scream.
+
 An emotion-driven Asteroids game that reads your face through the webcam and mirrors your emotions on a Doom-style HUD face — all rendered with vector graphics.
 
 ## Features
