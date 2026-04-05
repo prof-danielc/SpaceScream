@@ -51,6 +51,7 @@ python src/main.py
 | **E** | Strafe right |
 | **Space** | Fire bullet (hold for continuous fire, capped at 5/sec) |
 | **D** | Toggle debug emotion overlay |
+| **F10** | Toggle maximized screen |
 | **F11** | Toggle fullscreen |
 | **Escape** | Quit game |
 
